@@ -522,6 +522,12 @@
                 // }
                 this.playing = true;
                 this.activated = true;
+
+                if (this.mode === Runner.modes.LOCAL) {
+                  gtag('event', 'play-multiplayer');
+                } else if (this.mode === Runner.modes.OFFLINE) {
+                  gtag('event', 'play-singleplayer');
+                }
             // } else if (this.crashed) {
             //     this.restart();
             }
@@ -856,6 +862,12 @@
 
             // Reset the time clock.
             this.time = getTimeStamp();
+
+            if (this.mode === Runner.modes.LOCAL) {
+              gtag('event', 'gameover-multiplayer');
+            } else if (this.mode === Runner.modes.OFFLINE) {
+              gtag('event', 'gameover-singleplayer');
+            }
         },
 
         stop: function () {
@@ -892,6 +904,9 @@
                 this.playSound(this.soundFx.BUTTON_PRESS);
                 this.invert(true);
                 this.update();
+                if (this.mode === Runner.modes.OFFLINE) {
+                  gtag('event', 'play-singleplayer');
+                }
             }
         },
 
@@ -2810,9 +2825,21 @@ function showOfflineMode(show) {
   }
 }
 
+function addTrackingToLinks() {
+  for (let link of document.links) {
+    if (!link.getAttribute('onclick')) {
+      link.setAttribute('onclick', `getOutboundLink('${link.href}'); return true;`);
+    }
+  }
+}
+
 async function onDocumentLoad() {
   const SUB_TOPIC = 'dinosaur-game';
   const STORAGE_KEY = 'seed';
+
+  addTrackingToLinks();
+  setTimeout(addTrackingToLinks, 500);
+  setTimeout(addTrackingToLinks, 1000);
 
   showMessage("Initializing...");
   showOfflineMode(true);

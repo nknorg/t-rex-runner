@@ -2,26 +2,58 @@
 <html>
 
 <head>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-119165267-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'UA-119165267-2');
+    </script>
+    <script>
+    /**
+    * Function that registers a click on an outbound link in Analytics.
+    * This function takes a valid URL string as an argument, and uses that URL string
+    * as the event label. Setting the transport method to 'beacon' lets the hit be sent
+    * using 'navigator.sendBeacon' in browser that support it.
+    */
+    var getOutboundLink = function(url) {
+      gtag('event', 'click', {
+        'event_category': 'outbound',
+        'event_label': url,
+        'transport_type': 'beacon',
+        // 'event_callback': function(){document.location = url;}
+      });
+    }
+    </script>
+
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0, user-scalable=no">
     <title >NKN T-Rex Runner</title>
-    <script src="alea.min.js"></script>
-    <script src="nkn-multiclient.min.js"></script>
-    <script src="nkn-wallet.min.js"></script>
-    <script src="index.js"></script>
+    <script src="js/alea.min.js"></script>
+    <script src="js/nkn-multiclient.min.js"></script>
+    <script src="js/nkn-wallet.min.js"></script>
+    <script src="js/index.js"></script>
 </head>
 
 <body id="t" class="offline">
     <div id="messageBox" class="messagebox">
         <h1 id="title">NKN T-Rex Runner</h1>
         <h6 id="subtitle">A decentralized multi-player game powered by NKN</h6>
-        <h3><a target="_blank" href="https://forum.nkn.org/t/vote-for-nkn-in-renewed-binance-community-coin-vote-round-1/1750" style="text-decoration:underline;color:red;">Vote to list NKN on Binance!</a></h3>
+        <h3><a target="_blank" href="https://forum.nkn.org/t/vote-for-nkn-in-renewed-binance-community-coin-vote-round-1/1750" style="text-decoration:underline;color:red;">
+          Vote to list NKN on Binance!
+        </a></h3>
         <h4 id="message"></h4>
         <h4 id="offline-mode" style="display:none;">Or click me to practice in offline mode</h4>
     </div>
     <div class="footer">
-        <div><a target="_blank" href="https://github.com/nknorg/t-rex-runner">Source code</a></div>
-        <div>Powered by <a target="_blank" href="https://github.com/nknorg/nkn-client-js">NKN client</a> for p2p communication, and nCDN for caching static content</div>
+        <div>
+          <a target="_blank" href="https://github.com/nknorg/t-rex-runner">View source code on GitHub</a>
+        </div>
+        <div class="social-share" data-sites="twitter,facebook,wechat,weibo,qq"></div>
+        <div>
+          Powered by <a target="_blank" href="https://github.com/nknorg/nkn-client-js">NKN client</a> for p2p communication, and nCDN for caching static content
+        </div>
     </div>
     <div id="main-frame-error-local" class="interstitial-wrapper">
         <div id="local-identity" class="identity"></div>
@@ -42,7 +74,9 @@
         </template>
     </div>
 
-    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="css/share.min.css">
+    <script src="js/social-share.min.js"></script>
     <!-- <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet"> -->
 
 </body>
