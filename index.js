@@ -13,10 +13,10 @@
      */
     function Runner(outerContainerId, opt_config) {
         // Singleton
-        if (Runner.instance_) {
-            return Runner.instance_;
-        }
-        Runner.instance_ = this;
+        // if (Runner.instance_) {
+        //     return Runner.instance_;
+        // }
+        // Runner.instance_ = this;
 
         this.outerContainerEl = document.querySelector(outerContainerId);
         this.containerEl = null;
@@ -24,6 +24,9 @@
         this.detailsButton = this.outerContainerEl.querySelector('#details-button');
 
         this.config = opt_config || Runner.config;
+
+        this.rng = new alea(this.config.seed);
+        this.mode = this.config.mode;
 
         this.dimensions = Runner.defaultDimensions;
 
@@ -228,6 +231,28 @@
     };
 
 
+    Runner.modes = {
+        OFFLINE: 0,
+        LOCAL: 1,
+        REMOTE: 2,
+    };
+
+
+    Runner.actions = {
+        START_JUMP: 0,
+        END_JUMP: 1,
+        SPEED_DROP: 2,
+        START_DUCK: 3,
+        END_DUCK: 4,
+        START_GAME: 5,
+        GAME_OVER: 6,
+        FIND_GAME: 7,
+        ACCEPT_GAME: 8,
+        READY: 9,
+        HEARTBEAT: 10,
+    }
+
+
     Runner.prototype = {
         /**
          * Whether the easter egg has been disabled. CrOS enterprise enrolled devices.
@@ -307,7 +332,17 @@
          * Load and decode base 64 encoded sounds.
          */
         loadSounds: function () {
+            if (this.soundLoaded) {
+              return;
+            }
+            this.soundLoaded = true;
+
             if (!IS_IOS) {
+                let AudioContext = window.AudioContext || window.webkitAudioContext || false;
+                if (!AudioContext) {
+                  return;
+                }
+
                 this.audioContext = new AudioContext();
 
                 var resourceTemplate =
@@ -369,14 +404,14 @@
 
             // Horizon contains clouds, obstacles and the ground.
             this.horizon = new Horizon(this.canvas, this.spriteDef, this.dimensions,
-                this.config.GAP_COEFFICIENT);
+                this.config.GAP_COEFFICIENT, this.seed);
 
             // Distance meter
             this.distanceMeter = new DistanceMeter(this.canvas,
                 this.spriteDef.TEXT_SPRITE, this.dimensions.WIDTH);
 
             // Draw t-rex
-            this.tRex = new Trex(this.canvas, this.spriteDef.TREX);
+            this.tRex = new Trex(this.canvas, this.spriteDef.TREX, this.seed);
 
             this.outerContainerEl.appendChild(this.containerEl);
 
@@ -385,6 +420,7 @@
             }
 
             this.startListening();
+
             this.update();
 
             window.addEventListener(Runner.events.RESIZE,
@@ -395,9 +431,10 @@
          * Create the touch controller. A div that covers whole screen.
          */
         createTouchController: function () {
-            this.touchController = document.createElement('div');
-            this.touchController.className = Runner.classes.TOUCH_CONTROLLER;
-            this.outerContainerEl.appendChild(this.touchController);
+            this.touchController = document.getElementById('t');
+            // this.touchController = document.createElement('div');
+            // this.touchController.className = Runner.classes.TOUCH_CONTROLLER;
+            // this.outerContainerEl.appendChild(this.touchController);
         },
 
         /**
@@ -467,9 +504,9 @@
                     'from { width:' + Trex.config.WIDTH + 'px }' +
                     'to { width: ' + this.dimensions.WIDTH + 'px }' +
                     '}';
-                
-                // create a style sheet to put the keyframe rule in 
-                // and then place the style sheet in the html head    
+
+                // create a style sheet to put the keyframe rule in
+                // and then place the style sheet in the html head
                 var sheet = document.createElement('style');
                 sheet.innerHTML = keyframes;
                 document.head.appendChild(sheet);
@@ -485,8 +522,8 @@
                 // }
                 this.playing = true;
                 this.activated = true;
-            } else if (this.crashed) {
-                this.restart();
+            // } else if (this.crashed) {
+            //     this.restart();
             }
         },
 
@@ -501,15 +538,17 @@
             this.containerEl.style.webkitAnimation = '';
             this.playCount++;
 
-            // Handle tabbing off the page. Pause the current game.
-            document.addEventListener(Runner.events.VISIBILITY,
-                this.onVisibilityChange.bind(this));
+            if (this.mode === Runner.modes.OFFLINE) {
+              // Handle tabbing off the page. Pause the current game.
+              document.addEventListener(Runner.events.VISIBILITY,
+                  this.onVisibilityChange.bind(this));
 
-            window.addEventListener(Runner.events.BLUR,
-                this.onVisibilityChange.bind(this));
+              window.addEventListener(Runner.events.BLUR,
+                  this.onVisibilityChange.bind(this));
 
-            window.addEventListener(Runner.events.FOCUS,
-                this.onVisibilityChange.bind(this));
+              window.addEventListener(Runner.events.FOCUS,
+                  this.onVisibilityChange.bind(this));
+            }
         },
 
         clearCanvas: function () {
@@ -552,7 +591,7 @@
                 }
 
                 // Check for collisions.
-                var collision = hasObstacles &&
+                var collision = this.mode !== Runner.modes.REMOTE && hasObstacles &&
                     checkForCollision(this.horizon.obstacles[0], this.tRex);
 
                 if (!collision) {
@@ -563,6 +602,10 @@
                     }
                 } else {
                     this.gameOver();
+                    this.sendAction(Runner.actions.GAME_OVER);
+                    if (window.remoteRunner && !window.remoteRunner.crashed) {
+                      showMessage("YOU LOST");
+                    }
                 }
 
                 var playAchievementSound = this.distanceMeter.update(deltaTime,
@@ -626,6 +669,10 @@
          * Bind relevant key / mouse / touch listeners.
          */
         startListening: function () {
+            if (this.mode === Runner.modes.REMOTE) {
+                return;
+            }
+
             // Keys.
             document.addEventListener(Runner.events.KEYDOWN, this);
             document.addEventListener(Runner.events.KEYUP, this);
@@ -669,11 +716,12 @@
                 e.preventDefault();
             }
 
+            this.loadSounds();
+
             if (e.target != this.detailsButton) {
                 if (!this.crashed && (Runner.keycodes.JUMP[e.keyCode] ||
                     e.type == Runner.events.TOUCHSTART)) {
                     if (!this.playing) {
-                        this.loadSounds();
                         this.playing = true;
                         this.update();
                         if (window.errorPageController) {
@@ -684,12 +732,16 @@
                     if (!this.tRex.jumping && !this.tRex.ducking) {
                         this.playSound(this.soundFx.BUTTON_PRESS);
                         this.tRex.startJump(this.currentSpeed);
+                        this.sendAction(Runner.actions.START_JUMP);
                     }
                 }
 
-                if (this.crashed && e.type == Runner.events.TOUCHSTART &&
-                    e.currentTarget == this.containerEl) {
-                    this.restart();
+                if (this.crashed && e.type == Runner.events.TOUCHSTART && e.currentTarget == this.containerEl) {
+                    if (this.mode === Runner.modes.OFFLINE) {
+                        this.restart();
+                    } else if (this.mode === Runner.modes.LOCAL) {
+                        window.location.reload();
+                    }
                 }
             }
 
@@ -698,9 +750,11 @@
                 if (this.tRex.jumping) {
                     // Speed drop, activated only when jump key is not pressed.
                     this.tRex.setSpeedDrop();
+                    this.sendAction(Runner.actions.SPEED_DROP);
                 } else if (!this.tRex.jumping && !this.tRex.ducking) {
                     // Duck.
                     this.tRex.setDuck(true);
+                    this.sendAction(Runner.actions.START_DUCK);
                 }
             }
         },
@@ -718,9 +772,11 @@
 
             if (this.isRunning() && isjumpKey) {
                 this.tRex.endJump();
+                this.sendAction(Runner.actions.END_JUMP);
             } else if (Runner.keycodes.DUCK[keyCode]) {
                 this.tRex.speedDrop = false;
                 this.tRex.setDuck(false);
+                this.sendAction(Runner.actions.END_DUCK);
             } else if (this.crashed) {
                 // Check that enough time has elapsed before allowing jump key to restart.
                 var deltaTime = getTimeStamp() - this.time;
@@ -728,7 +784,11 @@
                 if (Runner.keycodes.RESTART[keyCode] || this.isLeftClickOnCanvas(e) ||
                     (deltaTime >= this.config.GAMEOVER_CLEAR_TIME &&
                         Runner.keycodes.JUMP[keyCode])) {
-                    this.restart();
+                    if (this.mode === Runner.modes.OFFLINE) {
+                        this.restart();
+                    } else if (this.mode === Runner.modes.LOCAL) {
+                        window.location.reload();
+                    }
                 }
             } else if (this.paused && isjumpKey) {
                 // Reset the jump state
@@ -783,7 +843,7 @@
             if (!this.gameOverPanel) {
                 this.gameOverPanel = new GameOverPanel(this.canvas,
                     this.spriteDef.TEXT_SPRITE, this.spriteDef.RESTART,
-                    this.dimensions);
+                    this.dimensions, this.mode);
             } else {
                 this.gameOverPanel.draw();
             }
@@ -874,7 +934,17 @@
                 this.inverted = document.body.classList.toggle(Runner.classes.INVERTED,
                     this.invertTrigger);
             }
-        }
+        },
+
+        sendAction: function (action) {
+            if (this.mode !== Runner.modes.LOCAL) {
+                return;
+            }
+            if (!window.nknClient || !window.remoteAddr) {
+                return;
+            }
+            window.nknClient.send(window.remoteAddr, JSON.stringify({ action }), { maxHoldingSeconds: 0 }).catch(() => {});
+        },
     };
 
 
@@ -922,17 +992,6 @@
         }
         return false;
     };
-
-
-    /**
-     * Get random number.
-     * @param {number} min
-     * @param {number} max
-     * @param {number}
-     */
-    function getRandomNum(min, max) {
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
 
 
     /**
@@ -1003,12 +1062,13 @@
      * @param {!Object} dimensions Canvas dimensions.
      * @constructor
      */
-    function GameOverPanel(canvas, textImgPos, restartImgPos, dimensions) {
+    function GameOverPanel(canvas, textImgPos, restartImgPos, dimensions, mode) {
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
         this.canvasDimensions = dimensions;
         this.textImgPos = textImgPos;
         this.restartImgPos = restartImgPos;
+        this.mode = mode;
         this.draw();
     };
 
@@ -1082,11 +1142,13 @@
                 textTargetX, textTargetY, textTargetWidth, textTargetHeight);
 
             // Restart button.
-            this.canvasCtx.drawImage(Runner.imageSprite,
-                this.restartImgPos.x, this.restartImgPos.y,
-                restartSourceWidth, restartSourceHeight,
-                restartTargetX, restartTargetY, dimensions.RESTART_WIDTH,
-                dimensions.RESTART_HEIGHT);
+            if (this.mode !== Runner.modes.REMOTE) {
+              this.canvasCtx.drawImage(Runner.imageSprite,
+                  this.restartImgPos.x, this.restartImgPos.y,
+                  restartSourceWidth, restartSourceHeight,
+                  restartTargetX, restartTargetY, dimensions.RESTART_WIDTH,
+                  dimensions.RESTART_HEIGHT);
+            }
         }
     };
 
@@ -1240,13 +1302,14 @@
      * @param {number} opt_xOffset
      */
     function Obstacle(canvasCtx, type, spriteImgPos, dimensions,
-        gapCoefficient, speed, opt_xOffset) {
+        gapCoefficient, speed, opt_xOffset, seed) {
 
+        this.rng = new alea(seed);
         this.canvasCtx = canvasCtx;
         this.spritePos = spriteImgPos;
         this.typeConfig = type;
         this.gapCoefficient = gapCoefficient;
-        this.size = getRandomNum(1, Obstacle.MAX_OBSTACLE_LENGTH);
+        this.size = this.getRandomNum(1, Obstacle.MAX_OBSTACLE_LENGTH);
         this.dimensions = dimensions;
         this.remove = false;
         this.xPos = dimensions.WIDTH + (opt_xOffset || 0);
@@ -1295,7 +1358,7 @@
                 if (Array.isArray(this.typeConfig.yPos)) {
                     var yPosConfig = IS_MOBILE ? this.typeConfig.yPosMobile :
                         this.typeConfig.yPos;
-                    this.yPos = yPosConfig[getRandomNum(0, yPosConfig.length - 1)];
+                    this.yPos = yPosConfig[this.getRandomNum(0, yPosConfig.length - 1)];
                 } else {
                     this.yPos = this.typeConfig.yPos;
                 }
@@ -1318,7 +1381,7 @@
 
                 // For obstacles that go at a different speed from the horizon.
                 if (this.typeConfig.speedOffset) {
-                    this.speedOffset = Math.random() > 0.5 ? this.typeConfig.speedOffset :
+                    this.speedOffset = this.rng() > 0.5 ? this.typeConfig.speedOffset :
                         -this.typeConfig.speedOffset;
                 }
 
@@ -1394,7 +1457,7 @@
                 var minGap = Math.round(this.width * speed +
                     this.typeConfig.minGap * gapCoefficient);
                 var maxGap = Math.round(minGap * Obstacle.MAX_GAP_COEFFICIENT);
-                return getRandomNum(minGap, maxGap);
+                return this.getRandomNum(minGap, maxGap);
             },
 
             /**
@@ -1417,7 +1480,11 @@
                         collisionBoxes[i].y, collisionBoxes[i].width,
                         collisionBoxes[i].height);
                 }
-            }
+            },
+
+            getRandomNum: function (min, max) {
+                return Math.floor(this.rng() * (max - min + 1)) + min;
+            },
         };
 
 
@@ -1487,7 +1554,8 @@
      * @param {Object} spritePos Positioning within image sprite.
      * @constructor
      */
-    function Trex(canvas, spritePos) {
+    function Trex(canvas, spritePos, seed) {
+        this.rng = new alea(seed);
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
         this.spritePos = spritePos;
@@ -1722,7 +1790,7 @@
          * Sets a random time for the blink to happen.
          */
         setBlinkDelay: function () {
-            this.blinkDelay = Math.ceil(Math.random() * Trex.BLINK_TIMING);
+            this.blinkDelay = Math.ceil(this.rng() * Trex.BLINK_TIMING);
         },
 
         /**
@@ -1840,7 +1908,11 @@
             this.midair = false;
             this.speedDrop = false;
             this.jumpCount = 0;
-        }
+        },
+
+        getRandomNum: function (min, max) {
+            return Math.floor(this.rng() * (max - min + 1)) + min;
+        },
     };
 
 
@@ -2114,7 +2186,8 @@
      * @param {Object} spritePos Position of image in sprite.
      * @param {number} containerWidth
      */
-    function Cloud(canvas, spritePos, containerWidth) {
+    function Cloud(canvas, spritePos, containerWidth, seed) {
+        this.rng = new alea(seed);
         this.canvas = canvas;
         this.canvasCtx = this.canvas.getContext('2d');
         this.spritePos = spritePos;
@@ -2122,7 +2195,7 @@
         this.xPos = containerWidth;
         this.yPos = 0;
         this.remove = false;
-        this.cloudGap = getRandomNum(Cloud.config.MIN_CLOUD_GAP,
+        this.cloudGap = this.getRandomNum(Cloud.config.MIN_CLOUD_GAP,
             Cloud.config.MAX_CLOUD_GAP);
 
         this.init();
@@ -2148,7 +2221,7 @@
          * Initialise the cloud. Sets the Cloud height.
          */
         init: function () {
-            this.yPos = getRandomNum(Cloud.config.MAX_SKY_LEVEL,
+            this.yPos = this.getRandomNum(Cloud.config.MAX_SKY_LEVEL,
                 Cloud.config.MIN_SKY_LEVEL);
             this.draw();
         },
@@ -2197,7 +2270,11 @@
          */
         isVisible: function () {
             return this.xPos + Cloud.config.WIDTH > 0;
-        }
+        },
+
+        getRandomNum: function (min, max) {
+            return Math.floor(this.rng() * (max - min + 1)) + min;
+        },
     };
 
 
@@ -2206,7 +2283,8 @@
     /**
      * Nightmode shows a moon and stars on the horizon.
      */
-    function NightMode(canvas, spritePos, containerWidth) {
+    function NightMode(canvas, spritePos, containerWidth, seed) {
+        this.rng = new alea(seed);
         this.spritePos = spritePos;
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
@@ -2335,8 +2413,8 @@
 
             for (var i = 0; i < NightMode.config.NUM_STARS; i++) {
                 this.stars[i] = {};
-                this.stars[i].x = getRandomNum(segmentSize * i, segmentSize * (i + 1));
-                this.stars[i].y = getRandomNum(0, NightMode.config.STAR_MAX_Y);
+                this.stars[i].x = this.getRandomNum(segmentSize * i, segmentSize * (i + 1));
+                this.stars[i].y = this.getRandomNum(0, NightMode.config.STAR_MAX_Y);
 
                 if (IS_HIDPI) {
                     this.stars[i].sourceY = Runner.spriteDefinition.HDPI.STAR.y +
@@ -2352,8 +2430,11 @@
             this.currentPhase = 0;
             this.opacity = 0;
             this.update(false);
-        }
+        },
 
+        getRandomNum: function (min, max) {
+            return Math.floor(this.rng() * (max - min + 1)) + min;
+        },
     };
 
 
@@ -2366,7 +2447,8 @@
      * @param {Object} spritePos Horizon position in sprite.
      * @constructor
      */
-    function HorizonLine(canvas, spritePos) {
+    function HorizonLine(canvas, spritePos, seed) {
+        this.rng = new alea(seed);
         this.spritePos = spritePos;
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
@@ -2421,7 +2503,7 @@
          * Return the crop x position of a type.
          */
         getRandomType: function () {
-            return Math.random() > this.bumpThreshold ? this.dimensions.WIDTH : 0;
+            return this.rng() > this.bumpThreshold ? this.dimensions.WIDTH : 0;
         },
 
         /**
@@ -2482,7 +2564,11 @@
         reset: function () {
             this.xPos[0] = 0;
             this.xPos[1] = HorizonLine.dimensions.WIDTH;
-        }
+        },
+
+        getRandomNum: function (min, max) {
+            return Math.floor(this.rng() * (max - min + 1)) + min;
+        },
     };
 
 
@@ -2496,7 +2582,8 @@
      * @param {number} gapCoefficient
      * @constructor
      */
-    function Horizon(canvas, spritePos, dimensions, gapCoefficient) {
+    function Horizon(canvas, spritePos, dimensions, gapCoefficient, seed) {
+        this.rng = new alea(seed);
         this.canvas = canvas;
         this.canvasCtx = this.canvas.getContext('2d');
         this.config = Horizon.config;
@@ -2538,9 +2625,9 @@
          */
         init: function () {
             this.addCloud();
-            this.horizonLine = new HorizonLine(this.canvas, this.spritePos.HORIZON);
+            this.horizonLine = new HorizonLine(this.canvas, this.spritePos.HORIZON, this.seed);
             this.nightMode = new NightMode(this.canvas, this.spritePos.MOON,
-                this.dimensions.WIDTH);
+                this.dimensions.WIDTH, this.seed);
         },
 
         /**
@@ -2581,7 +2668,7 @@
                 // Check for adding a new cloud.
                 if (numClouds < this.config.MAX_CLOUDS &&
                     (this.dimensions.WIDTH - lastCloud.xPos) > lastCloud.cloudGap &&
-                    this.cloudFrequency > Math.random()) {
+                    this.cloudFrequency > this.rng()) {
                     this.addCloud();
                 }
 
@@ -2639,7 +2726,7 @@
          * @param {number} currentSpeed
          */
         addNewObstacle: function (currentSpeed) {
-            var obstacleTypeIndex = getRandomNum(0, Obstacle.types.length - 1);
+            var obstacleTypeIndex = this.getRandomNum(0, Obstacle.types.length - 1);
             var obstacleType = Obstacle.types[obstacleTypeIndex];
 
             // Check for multiples of the same type of obstacle.
@@ -2652,7 +2739,7 @@
 
                 this.obstacles.push(new Obstacle(this.canvasCtx, obstacleType,
                     obstacleSpritePos, this.dimensions,
-                    this.gapCoefficient, currentSpeed, obstacleType.width));
+                    this.gapCoefficient, currentSpeed, obstacleType.width, this.seed));
 
                 this.obstacleHistory.unshift(obstacleType.type);
 
@@ -2702,14 +2789,246 @@
          */
         addCloud: function () {
             this.clouds.push(new Cloud(this.canvas, this.spritePos.CLOUD,
-                this.dimensions.WIDTH));
-        }
+                this.dimensions.WIDTH, this.seed));
+        },
+
+        getRandomNum: function (min, max) {
+            return Math.floor(this.rng() * (max - min + 1)) + min;
+        },
     };
 })();
 
+function showMessage(text) {
+  document.getElementById("message").textContent = text;
+}
 
-function onDocumentLoad() {
-    new Runner('.interstitial-wrapper');
+function showOfflineMode(show) {
+  if (show) {
+    document.getElementById("offline-mode").style.display = '';
+  } else {
+    document.getElementById("offline-mode").style.display = 'none';
+  }
+}
+
+async function onDocumentLoad() {
+  const SUB_TOPIC = 'dinosaur-game';
+  const STORAGE_KEY = 'seed';
+
+  showMessage("Initializing...");
+  showOfflineMode(true);
+
+  let offlineModeStart = false;
+  let offlineModePromise = new Promise(function(resolve, reject) {
+    let startOfflineMode = function () {
+      offlineModeStart = true;
+      showMessage("Run! T-Rex, Run!");
+      showOfflineMode(false);
+
+      let offlineRunner = new Runner('#main-frame-error-local', Object.assign({}, Runner.config, {mode: Runner.modes.OFFLINE}));
+      offlineRunner.play();
+      offlineRunner.startListening();
+      offlineRunner.playIntro();
+
+      resolve();
+    }
+    let btn = document.getElementById('offline-mode');
+    btn.addEventListener('click', startOfflineMode);
+    if (Runner.IS_TOUCH_ENABLED) {
+      btn.addEventListener('touchstart', startOfflineMode);
+    }
+  });
+
+  nknWallet.configure({
+    rpcAddr: 'http://mainnet-seed-0001.nkn.org:30003',
+  })
+
+  let wallet = nknWallet.newWallet('password');
+  let client = nkn({ seed: wallet.getSeed() });
+  let rngSeed = Math.ceil(Math.random()*2**16);
+  let remoteRngSeed;
+
+  let onConnect = new Promise(function(resolve, reject) {
+    client.on('connect', resolve);
+  });
+
+  let localRunner, remoteRunner, findGameResolve, readyResolve, foundGame = false;
+
+  client.on('message', (src, payload) => {
+    let msg = JSON.parse(payload);
+    switch (msg.action) {
+      case Runner.actions.START_JUMP:
+        remoteRunner && remoteRunner.tRex.startJump(remoteRunner.currentSpeed);
+        break;
+      case Runner.actions.END_JUMP:
+        remoteRunner && remoteRunner.tRex.endJump();
+        break;
+      case Runner.actions.SPEED_DROP:
+        remoteRunner && remoteRunner.tRex.setSpeedDrop();
+        break;
+      case Runner.actions.START_DUCK:
+        remoteRunner && remoteRunner.tRex.setDuck(true);
+        break;
+      case Runner.actions.END_DUCK:
+        if (remoteRunner) {
+          remoteRunner.tRex.speedDrop = false;
+          remoteRunner.tRex.setDuck(false);
+        }
+        break;
+      case Runner.actions.START_GAME:
+        remoteRunner && remoteRunner.playIntro();
+        break;
+      case Runner.actions.GAME_OVER:
+        remoteRunner && remoteRunner.gameOver();
+        if (localRunner && !localRunner.crashed) {
+          showMessage("CONGRATULATIONS! YOU WIN!");
+        }
+        break;
+      case Runner.actions.FIND_GAME:
+        if (!foundGame) {
+          foundGame = true;
+          findGameResolve && setTimeout(function () {
+            findGameResolve(src);
+          }, 100);
+          return;
+        }
+        if (src === window.remoteAddr) {
+          return;
+        }
+        break;
+      case Runner.actions.ACCEPT_GAME:
+        if (src === window.remoteAddr) {
+          return;
+        }
+        break;
+      case Runner.actions.READY:
+        if (src === window.remoteAddr) {
+          readyResolve && readyResolve(msg.rngSeed);
+        }
+        break;
+      default:
+        console.log("Unknown action", msg.action);
+    }
+    return false;
+  });
+
+  wallet.subscribe(SUB_TOPIC, 30).catch(e => {
+    console.log('subscribe fails:', e);
+  });
+
+  await Promise.race([onConnect, offlineModePromise]);
+  if (offlineModeStart) {
+    return;
+  }
+  window.nknClient = client;
+
+  while (true) {
+    if (offlineModeStart) {
+      return;
+    }
+
+    showMessage("Looking for other players...");
+
+    foundGame = false;
+    window.remoteAddr = undefined;
+
+    let findGamePromise = new Promise(function(resolve, reject) {
+      findGameResolve = resolve;
+    });
+    let readyPromise = new Promise(function(resolve, reject) {
+      readyResolve = resolve;
+    });
+
+    let subscribers, promises;
+    try {
+      let res = await Promise.race([client.defaultClient.getSubscribers(SUB_TOPIC, { limit: 100, txPool: true, meta: false }), offlineModePromise]);
+      if (offlineModeStart) {
+        return;
+      }
+      subscribers = res.subscribersInTxPool.concat(res.subscribers).filter(addr => addr !== client.addr);
+    } catch (e) {
+      console.warn('get subscriber error:', e);
+      continue
+    }
+
+    if (subscribers.length > 0) {
+      promises = subscribers.map(async (addr) => {
+        await client.send(addr, JSON.stringify({ action: Runner.actions.FIND_GAME }), { maxHoldingSeconds: 0 });
+        return addr;
+      });
+    } else {
+      promises = [new Promise(function(resolve, reject) {
+        setTimeout(reject, 5000);
+      })];
+    }
+
+    promises.push(findGamePromise);
+    promises.push(offlineModePromise);
+
+    try {
+      window.remoteAddr = await Promise.race(promises);
+    } catch (e) {
+      console.log("Continue finding game...");
+      continue
+    }
+
+    if (offlineModeStart) {
+      return;
+    }
+
+    showOfflineMode(false);
+
+    try {
+      await client.send(window.remoteAddr, JSON.stringify({ action: Runner.actions.ACCEPT_GAME }), { maxHoldingSeconds: 0 });
+    } catch (e) {
+      try {
+        await client.send(window.remoteAddr, JSON.stringify({ action: Runner.actions.ACCEPT_GAME }), { maxHoldingSeconds: 0 });
+      } catch (e) {
+        console.log("Waiting for accept game reply timeout, continue finding game...");
+        continue
+      }
+    }
+
+    window.alert("Found match, get ready!");
+    client.send(window.remoteAddr, JSON.stringify({ action: Runner.actions.READY, rngSeed: rngSeed }), { maxHoldingSeconds: 0 }).catch(() => {});
+
+    showMessage("Waiting for opponent to accept game...");
+    try {
+      remoteRngSeed = await Promise.race([readyPromise, new Promise(function(resolve, reject) {
+        setTimeout(reject, 30000);
+      })]);
+    } catch (e) {
+      console.log("Waiting for ready timeout, continue finding game...");
+      continue
+    }
+
+    break;
+  }
+
+  let sharedRngSeed = rngSeed + remoteRngSeed;
+  localRunner = new Runner('#main-frame-error-local', Object.assign({}, Runner.config, {seed: sharedRngSeed, mode: Runner.modes.LOCAL}));
+  remoteRunner = new Runner('#main-frame-error-remote', Object.assign({}, Runner.config, {seed: sharedRngSeed, mode: Runner.modes.REMOTE}));
+  localRunner.play();
+  remoteRunner.play();
+  window.localRunner = localRunner;
+  window.remoteRunner = remoteRunner;
+
+  document.getElementById('local-identity').textContent = `You (${client.addr}):`;
+  document.getElementById('remote-identity').textContent = `Opponent (${window.remoteAddr}):`;
+
+  await Promise.all([0,1,2,3].map(t => new Promise(function(resolve, reject) {
+    setTimeout(function () {
+      if (t < 3) {
+        showMessage("Game starts in " + (3-t) + "s...");
+      } else {
+        showMessage("Run! T-Rex, Run!");
+      }
+      resolve();
+    }, 1000 * t);
+  })));
+
+  localRunner.startListening();
+  localRunner.playIntro();
+  localRunner.sendAction(Runner.actions.START_GAME);
 }
 
 document.addEventListener('DOMContentLoaded', onDocumentLoad);
