@@ -25,6 +25,7 @@
 
         this.config = opt_config || Runner.config;
 
+        this.seed = this.config.seed;
         this.rng = new alea(this.config.seed);
         this.mode = this.config.mode;
 
@@ -404,14 +405,14 @@
 
             // Horizon contains clouds, obstacles and the ground.
             this.horizon = new Horizon(this.canvas, this.spriteDef, this.dimensions,
-                this.config.GAP_COEFFICIENT, this.seed);
+                this.config.GAP_COEFFICIENT, this.seed + this.rng());
 
             // Distance meter
             this.distanceMeter = new DistanceMeter(this.canvas,
                 this.spriteDef.TEXT_SPRITE, this.dimensions.WIDTH);
 
             // Draw t-rex
-            this.tRex = new Trex(this.canvas, this.spriteDef.TREX, this.seed);
+            this.tRex = new Trex(this.canvas, this.spriteDef.TREX, this.seed + this.rng());
 
             this.outerContainerEl.appendChild(this.containerEl);
 
@@ -1319,6 +1320,7 @@
     function Obstacle(canvasCtx, type, spriteImgPos, dimensions,
         gapCoefficient, speed, opt_xOffset, seed) {
 
+        this.seed = seed;
         this.rng = new alea(seed);
         this.canvasCtx = canvasCtx;
         this.spritePos = spriteImgPos;
@@ -1570,6 +1572,7 @@
      * @constructor
      */
     function Trex(canvas, spritePos, seed) {
+        this.seed = seed;
         this.rng = new alea(seed);
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
@@ -2202,6 +2205,7 @@
      * @param {number} containerWidth
      */
     function Cloud(canvas, spritePos, containerWidth, seed) {
+        this.seed = seed;
         this.rng = new alea(seed);
         this.canvas = canvas;
         this.canvasCtx = this.canvas.getContext('2d');
@@ -2299,6 +2303,7 @@
      * Nightmode shows a moon and stars on the horizon.
      */
     function NightMode(canvas, spritePos, containerWidth, seed) {
+        this.seed = seed;
         this.rng = new alea(seed);
         this.spritePos = spritePos;
         this.canvas = canvas;
@@ -2463,6 +2468,7 @@
      * @constructor
      */
     function HorizonLine(canvas, spritePos, seed) {
+        this.seed = seed;
         this.rng = new alea(seed);
         this.spritePos = spritePos;
         this.canvas = canvas;
@@ -2598,6 +2604,7 @@
      * @constructor
      */
     function Horizon(canvas, spritePos, dimensions, gapCoefficient, seed) {
+        this.seed = seed;
         this.rng = new alea(seed);
         this.canvas = canvas;
         this.canvasCtx = this.canvas.getContext('2d');
@@ -2640,9 +2647,9 @@
          */
         init: function () {
             this.addCloud();
-            this.horizonLine = new HorizonLine(this.canvas, this.spritePos.HORIZON, this.seed);
+            this.horizonLine = new HorizonLine(this.canvas, this.spritePos.HORIZON, this.seed + this.rng());
             this.nightMode = new NightMode(this.canvas, this.spritePos.MOON,
-                this.dimensions.WIDTH, this.seed);
+                this.dimensions.WIDTH, this.seed + this.rng());
         },
 
         /**
@@ -2754,7 +2761,7 @@
 
                 this.obstacles.push(new Obstacle(this.canvasCtx, obstacleType,
                     obstacleSpritePos, this.dimensions,
-                    this.gapCoefficient, currentSpeed, obstacleType.width, this.seed));
+                    this.gapCoefficient, currentSpeed, obstacleType.width, this.seed + this.rng()));
 
                 this.obstacleHistory.unshift(obstacleType.type);
 
@@ -2804,7 +2811,7 @@
          */
         addCloud: function () {
             this.clouds.push(new Cloud(this.canvas, this.spritePos.CLOUD,
-                this.dimensions.WIDTH, this.seed));
+                this.dimensions.WIDTH, this.seed + this.rng()));
         },
 
         getRandomNum: function (min, max) {
@@ -2904,7 +2911,7 @@ async function onDocumentLoad() {
       showMessage(i18next.t('in-game'));
       showOfflineMode(false);
 
-      let offlineRunner = new Runner('#main-frame-error-local', Object.assign({}, Runner.config, {mode: Runner.modes.OFFLINE}));
+      let offlineRunner = new Runner('#main-frame-error-local', Object.assign({}, Runner.config, {seed: Math.random(), mode: Runner.modes.OFFLINE}));
       offlineRunner.play();
       offlineRunner.startListening();
       offlineRunner.playIntro();
