@@ -2852,7 +2852,7 @@ async function onDocumentLoad() {
     resources: {
       en: {
         translation: {
-          "title": "NKN T-Rex Runner",
+          "title": "T-Rex Runner",
           "subtitle": "A decentralized multi-player game powered by NKN",
           "offline-mode": "Or click me to practice in offline mode",
           "initializing": "Initializing...",
@@ -2871,7 +2871,7 @@ async function onDocumentLoad() {
       },
       zh: {
         translation: {
-          "title": "NKN T-Rex Runner",
+          "title": "T-Rex Runner",
           "subtitle": "一个基于 NKN 的去中心化多人游戏",
           "offline-mode": "点我在离线模式中练习",
           "initializing": "初始化中...",
