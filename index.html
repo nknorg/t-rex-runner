@@ -29,8 +29,10 @@
 
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0, user-scalable=no">
-    <title >NKN T-Rex Runner</title>
+    <title>NKN T-Rex Runner</title>
     <script src="js/alea.min.js"></script>
+    <script src="js/i18next.min.js"></script>
+    <script src="js/i18nextBrowserLanguageDetector.min.js"></script>
     <script src="js/nkn-multiclient.min.js"></script>
     <script src="js/nkn-wallet.min.js"></script>
     <script src="js/index.js"></script>
@@ -39,13 +41,11 @@
 
 <body id="t" class="offline">
     <div id="messageBox" class="messagebox">
-        <h1 id="title">NKN T-Rex Runner</h1>
-        <h6 id="subtitle">A decentralized multi-player game powered by NKN</h6>
-        <h3><a target="_blank" href="https://forum.nkn.org/t/vote-for-nkn-in-renewed-binance-community-coin-vote-round-1/1750" style="text-decoration:underline;color:red;">
-          Vote to list NKN on Binance!
-        </a></h3>
+        <h1 id="title" class="i18next"></h1>
+        <h6 id="subtitle" class="i18next"></h6>
+        <h3><a id="vote" class="i18next" target="_blank" href="https://forum.nkn.org/t/vote-for-nkn-in-renewed-binance-community-coin-vote-round-1/1750" style="text-decoration:underline;color:red;"></a></h3>
         <h4 id="message"></h4>
-        <h4 id="offline-mode" style="display:none;">Or click me to practice in offline mode</h4>
+        <h4 id="offline-mode" class="i18next" style="display:none;"></h4>
     </div>
     <div class="footer">
         <div>

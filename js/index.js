@@ -583,9 +583,9 @@
                 var hasObstacles = this.runningTime > this.config.CLEAR_TIME;
 
                 // First jump triggers the intro.
-                if (this.tRex.jumpCount == 1 && !this.playingIntro) {
-                    this.playIntro();
-                }
+                // if (this.tRex.jumpCount == 1 && !this.playingIntro) {
+                //     this.playIntro();
+                // }
 
                 // The horizon doesn't move until the intro is over.
                 if (this.playingIntro) {
@@ -610,7 +610,7 @@
                     this.gameOver();
                     this.sendAction(Runner.actions.GAME_OVER);
                     if (window.remoteRunner && !window.remoteRunner.crashed) {
-                      showMessage("YOU LOST");
+                      showMessage(i18next.t('lost'));
                     }
                 }
 
@@ -2836,19 +2836,68 @@ function addTrackingToLinks() {
 async function onDocumentLoad() {
   const SUB_TOPIC = 'dinosaur-game';
   const STORAGE_KEY = 'seed';
+  const acceptTimeout = 30000;
+
+  await i18next.use(i18nextBrowserLanguageDetector).init({
+    detection: {
+      order: ['querystring', 'navigator', 'htmlTag'],
+    },
+    resources: {
+      en: {
+        translation: {
+          "title": "NKN T-Rex Runner",
+          "subtitle": "A decentralized multi-player game powered by NKN",
+          "offline-mode": "Or click me to practice in offline mode",
+          "initializing": "Initializing...",
+          "finding-match": "Looking for other players...",
+          "found-match": "Found match, get ready!",
+          "waiting-for-opponent-accept": "Waiting for opponent to accept game...",
+          "game-will-start": "Game starts in",
+          "in-game": "Run! T-Rex, Run!",
+          "win": "CONGRATULATIONS! YOU WIN!",
+          "lost": "YOU LOST",
+          "you": "You",
+          "opponent": "Opponent",
+          "vote": "Vote to list NKN on Binance!",
+        },
+      },
+      zh: {
+        translation: {
+          "title": "NKN T-Rex Runner",
+          "subtitle": "一个基于 NKN 的去中心化多人游戏",
+          "offline-mode": "点我在离线模式中练习",
+          "initializing": "初始化中...",
+          "finding-match": "寻找其他玩家...",
+          "found-match": "匹配成功，准备开始游戏！",
+          "waiting-for-opponent-accept": "等待对手接受比赛...",
+          "game-will-start": "游戏即将开始",
+          "in-game": "T-Rex 加油！",
+          "win": "恭喜你赢得了比赛！",
+          "lost": "大侠请重新来过",
+          "you": "你",
+          "opponent": "对手",
+          "vote": "为 NKN 上币安投票！",
+        },
+      },
+    }
+  });
+
+  document.querySelectorAll('.i18next').forEach((item) => {
+    item.innerHTML = i18next.t(item.id);
+  });
 
   addTrackingToLinks();
   setTimeout(addTrackingToLinks, 500);
   setTimeout(addTrackingToLinks, 1000);
 
-  showMessage("Initializing...");
+  showMessage(i18next.t('initializing'));
   showOfflineMode(true);
 
   let offlineModeStart = false;
   let offlineModePromise = new Promise(function(resolve, reject) {
     let startOfflineMode = function () {
       offlineModeStart = true;
-      showMessage("Run! T-Rex, Run!");
+      showMessage(i18next.t('in-game'));
       showOfflineMode(false);
 
       let offlineRunner = new Runner('#main-frame-error-local', Object.assign({}, Runner.config, {mode: Runner.modes.OFFLINE}));
@@ -2907,7 +2956,7 @@ async function onDocumentLoad() {
       case Runner.actions.GAME_OVER:
         remoteRunner && remoteRunner.gameOver();
         if (localRunner && !localRunner.crashed) {
-          showMessage("CONGRATULATIONS! YOU WIN!");
+          showMessage(i18next.t('win'));
         }
         break;
       case Runner.actions.FIND_GAME:
@@ -2953,7 +3002,7 @@ async function onDocumentLoad() {
       return;
     }
 
-    showMessage("Looking for other players...");
+    showMessage(i18next.t('finding-match'));
 
     foundGame = false;
     window.remoteAddr = undefined;
@@ -3015,14 +3064,16 @@ async function onDocumentLoad() {
       }
     }
 
-    window.alert("Found match, get ready!");
+    let acceptTimeoutPromise = new Promise(function(resolve, reject) {
+      setTimeout(reject, acceptTimeout);
+    });
+
+    window.alert(i18next.t('found-match'));
     client.send(window.remoteAddr, JSON.stringify({ action: Runner.actions.READY, rngSeed: rngSeed }), { maxHoldingSeconds: 0 }).catch(() => {});
 
-    showMessage("Waiting for opponent to accept game...");
+    showMessage(i18next.t('waiting-for-opponent-accept'));
     try {
-      remoteRngSeed = await Promise.race([readyPromise, new Promise(function(resolve, reject) {
-        setTimeout(reject, 30000);
-      })]);
+      remoteRngSeed = await Promise.race([readyPromise, acceptTimeoutPromise]);
     } catch (e) {
       console.log("Waiting for ready timeout, continue finding game...");
       continue
@@ -3039,15 +3090,15 @@ async function onDocumentLoad() {
   window.localRunner = localRunner;
   window.remoteRunner = remoteRunner;
 
-  document.getElementById('local-identity').textContent = `You (${client.addr}):`;
-  document.getElementById('remote-identity').textContent = `Opponent (${window.remoteAddr}):`;
+  document.getElementById('local-identity').textContent = `${i18next.t('you')} (${client.addr}):`;
+  document.getElementById('remote-identity').textContent = `${i18next.t('opponent')} (${window.remoteAddr}):`;
 
   await Promise.all([0,1,2,3].map(t => new Promise(function(resolve, reject) {
     setTimeout(function () {
       if (t < 3) {
-        showMessage("Game starts in " + (3-t) + "s...");
+        showMessage(i18next.t('game-will-start') + ": " + (3-t) + "s...");
       } else {
-        showMessage("Run! T-Rex, Run!");
+        showMessage(i18next.t('in-game'));
       }
       resolve();
     }, 1000 * t);
