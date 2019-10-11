@@ -2865,8 +2865,6 @@ async function onDocumentLoad() {
           "lost": "YOU LOST",
           "you": "You",
           "opponent": "Opponent",
-          "vote": "Vote to list NKN on Binance!",
-          "voteLink": "https://forum.nkn.org/t/vote-for-nkn-in-renewed-binance-community-coin-vote-round-1/1750",
         },
       },
       zh: {
@@ -2884,8 +2882,6 @@ async function onDocumentLoad() {
           "lost": "大侠请重新来过",
           "you": "你",
           "opponent": "对手",
-          "vote": "为 NKN 上币安投票！",
-          "voteLink": "https://forum.nkn.org/t/nkn/1751",
         },
       },
     }
@@ -2894,8 +2890,6 @@ async function onDocumentLoad() {
   document.querySelectorAll('.i18next').forEach((item) => {
     item.innerHTML = i18next.t(item.id);
   });
-
-  document.getElementById('vote').href = i18next.t('voteLink');
 
   addTrackingToLinks();
   setTimeout(addTrackingToLinks, 500);
